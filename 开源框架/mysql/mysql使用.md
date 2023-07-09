@@ -229,7 +229,7 @@ hostname表示账号可以从哪些客户端访问数据库
 
 
 ```
-create user 'hewutao'@'%' identified by 'hewutao12#$%'
+create user 'hewutao'@'%' identified by '******'
 ```
 
 
@@ -545,7 +545,7 @@ enforce-gtid-consistency=ON
 CREATE USER 'repl'@'%.example.com' IDENTIFIED BY 'password';
 GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%.example.com';
 
-CREATE USER 'repl'@'192.168.3.%' IDENTIFIED BY 'hewutao12#$%';
+CREATE USER 'repl'@'192.168.3.%' IDENTIFIED BY '******';
 GRANT REPLICATION SLAVE ON *.* TO 'repl'@'192.168.3.%';
 ```
 
@@ -596,7 +596,7 @@ server_id_list:
 
 
 ```
-change master to MASTER_HOST='192.168.3.69',MASTER_USER='repl',MASTER_PASSWORD='hewutao12#$%'  ,MASTER_AUTO_POSITION=1;
+change master to MASTER_HOST='192.168.3.69',MASTER_USER='repl',MASTER_PASSWORD='******'  ,MASTER_AUTO_POSITION=1;
 start slave;
 ```
 
@@ -660,11 +660,11 @@ mysqldump [options] --all-databases
 
 
 ```
-mysqldump -h192.168.3.69 -uhewutao -phewutao12#$% --databases test_db > test_db_database.sql
+mysqldump -h192.168.3.69 -uhewutao -p****** --databases test_db > test_db_database.sql
 
-mysqldump -h192.168.3.69 -uhewutao -phewutao12#$% -A > all_database.sql
+mysqldump -h192.168.3.69 -uhewutao -p****** -A > all_database.sql
 
-mysqldump -h192.168.3.69 -uhewutao -phewutao12#$% --master-data --databases test_db > test_db_master_data.sql
+mysqldump -h192.168.3.69 -uhewutao -p****** --master-data --databases test_db > test_db_master_data.sql
 ```
 
 
@@ -677,7 +677,7 @@ https://github.com/percona/percona-xtrabackup/tags
 
 ```sql
 # 使用 `xtrabackup --backup` 执行备份
-xtrabackup --backup --host=127.0.0.1 --user=hewutao --password='hewutao12#$%' --target-dir=/root/xtrabackup/bk_20220508
+xtrabackup --backup --host=127.0.0.1 --user=hewutao --password='******' --target-dir=/root/xtrabackup/bk_20220508
 
 # `xtrabackup --prepare` 执行准备。
 # 如果要将本次备份的数据作为后续增量备份的基础，应该使用 `xtrabackup –apply-log-only`（见增量备份步骤）
@@ -701,7 +701,7 @@ xtrabackup --copy-back --target-dir=/root/bk_20220508 --datadir=/usr/local/mysql
 # mysql-bin.000005        1046    1fd6b13f-c9eb-11ec-b339-000c29e8420c:1-3
 
 # 2. 服务启动后，手动指定位置
-change master to MASTER_HOST='192.168.3.69',MASTER_USER='repl',MASTER_PASSWORD='hewutao12#$%' ,MASTER_LOG_FILE = 'mysql-bin.000005',MASTER_LOG_POS = 1046
+change master to MASTER_HOST='192.168.3.69',MASTER_USER='repl',MASTER_PASSWORD='******' ,MASTER_LOG_FILE = 'mysql-bin.000005',MASTER_LOG_POS = 1046
 ```
 
 
@@ -745,7 +745,7 @@ mysql-bin.000006 517
 mysql-bin.000006 2189
 
 ```shell
-mysqlbinlog --start-position=517 --stop-position=2189 mysql-bin.000006 | mysql -h192.168.3.72 -uhewutao -phewutao12#$%
+mysqlbinlog --start-position=517 --stop-position=2189 mysql-bin.000006 | mysql -h192.168.3.72 -uhewutao -p******
 ```
 
 
@@ -769,7 +769,7 @@ set @@SESSION.GTID_NEXT='1fd6b13f-c9eb-11ec-b339-000c29e8420c:5'
 ### 连接不上
 
 ```
-➜  ~ mysql -h192.168.3.69   -uhewutao -phewutao12#$%
+➜  ~ mysql -h192.168.3.69   -uhewutao -p******
 mysql: [Warning] Using a password on the command line interface can be insecure.
 ERROR 2003 (HY000): Can't connect to MySQL server on '192.168.3.69:3306' (61)
 ```

@@ -624,7 +624,7 @@ expect {
         send -- "yes\n"; exp_continue
     }
     "*password*" {
-        send -- "hewutao12#$%\n"
+        send -- "******\n"
     }
 }
 

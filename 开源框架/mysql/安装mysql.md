@@ -225,7 +225,7 @@ mysql -uroot -pfJ9&j.NDvjJ2 -S /usr/local/mysql/data/mysql.sock
 set password=password('新密码')
 
 
-create user 'hewutao'@'%' IDENTIFIED BY 'hewutao12#$%' ;
+create user 'hewutao'@'%' IDENTIFIED BY '******' ;
 
 grant all on *.* to 'hewutao'@'%';
 ```
