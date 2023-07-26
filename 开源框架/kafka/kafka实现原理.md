@@ -1075,3 +1075,12 @@ broker本地管理的分区的类
 
 
 
+
+
+## 水位
+
+水位是控制客户端可以读取数据的最大偏移。
+
+leader副本的水位=min(所有replica.logEndOffset)
+
+follower副本的水位=min(自己replica.logEndOffset, leader水位)
