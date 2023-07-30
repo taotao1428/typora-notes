@@ -199,3 +199,276 @@ data = a / b / c / d
 sendp(data, inter=0.2, count=10, iface=src_if)
 ```
 
+
+
+![image-20230730090023537](/linux/.assert/ipv6网络协议/image-20230730090023537.png)
+
+scapy发送报文
+
+![image-20230730090718590](/linux/.assert/ipv6网络协议/image-20230730090718590.png)
+
+scoket发送报文
+
+![image-20230730090527262](/linux/.assert/ipv6网络协议/image-20230730090527262.png)
+
+
+
+
+
+scapy报文
+
+![image-20230730090853233](/linux/.assert/ipv6网络协议/image-20230730090853233.png)
+
+![image-20230730091607320](/linux/.assert/ipv6网络协议/image-20230730091607320.png)
+
+
+
+socket报文
+
+![image-20230730091104796](/linux/.assert/ipv6网络协议/image-20230730091104796.png)
+
+
+
+![image-20230730092112893](/linux/.assert/ipv6网络协议/image-20230730092112893.png)
+
+
+
+![image-20230730095318047](/linux/.assert/ipv6网络协议/image-20230730095318047.png)
+
+
+
+socket报文
+
+![image-20230730111522346](/linux/.assert/ipv6网络协议/image-20230730111522346.png)
+
+scapy报文
+
+![image-20230730111904916](/linux/.assert/ipv6网络协议/image-20230730111904916.png)
+
+
+
+![image-20230730135012752](/linux/.assert/ipv6网络协议/image-20230730135012752.png)
+
+
+
+![image-20230730134929455](/linux/.assert/ipv6网络协议/image-20230730134929455.png)
+
+
+
+
+
+s
+
+[![img](/linux/.assert/ipv6网络协议/format,png.png)](https://imgconvert.csdnimg.cn/aHR0cHM6Ly91cGxvYWQtaW1hZ2VzLmppYW5zaHUuaW8vdXBsb2FkX2ltYWdlcy8zNDgyNTU1LWY5NWMyNDcyYzUyM2ViNGEucG5n?x-oss-process=image/format,png)
+
+
+
+https://zhuanlan.zhihu.com/p/110407399?utm_id=0
+
+![img](/linux/.assert/ipv6网络协议/v2-1f07ba7f7c43144a6d6e41947c4c31c4_1440w.jpg)
+
+
+
+![img](/linux/.assert/ipv6网络协议/v2-70c3dbea90b7dbe96be618bae89b5a19_1440w.jpg)
+
+
+
+### 使用socket和struct构造NA广播报文
+
+
+
+```python
+import array
+import ipaddress
+import socket
+import struct
+from abc import abstractmethod
+
+
+class Packet:
+    def get_type(self) -> int:
+        return -1
+
+    @abstractmethod
+    def build(self, upper_layer) -> bytes:
+        pass
+
+
+class Ether(Packet):
+    def __init__(self, src_mac, dst_mac):
+        self.src_mac = src_mac
+        self.dst_mac = dst_mac
+        self.payload: Packet | None = None
+
+    def set_payload(self, payload: Packet):
+        self.payload = payload
+
+    def build(self, upper_layer=None) -> bytes:
+        if self.payload is None:
+            raise Exception("payload is not set yet")
+
+        src_mac_bytes = bytes.fromhex(self.src_mac.replace(":", ""))
+        dst_mac_bytes = bytes.fromhex(self.dst_mac.replace(":", ""))
+        proto_type = self.payload.get_type()
+        payload_bytes = self.payload.build(self)
+
+        return dst_mac_bytes + src_mac_bytes + struct.pack("!H", proto_type) + payload_bytes
+
+
+class IPv6(Packet):
+    def __init__(self, src_ip, dst_ip, traffic_class=0x00, flow_label=0, hop_limit=255):
+        self.src_ip = src_ip
+        self.dst_ip = dst_ip
+        self.traffic_class = traffic_class
+        self.flow_label = flow_label
+        self.hop_limit = hop_limit
+
+        self.payload: Packet | None = None
+
+    def get_type(self) -> int:
+        return 0x86dd # 在Ether报文中IPv6的类型
+
+    def set_payload(self, payload: Packet):
+        self.payload = payload
+
+    def build(self, upper_layer) -> bytes:
+        if self.payload is None:
+            raise Exception("payload is not set yet")
+
+        version = 6
+        first_row = ((version & 0xf) << 28) | ((self.traffic_class & 0xff) << 20) | (self.flow_label & 0xfffff)
+        payload_bytes = self.payload.build(self)
+        next_header = self.payload.get_type()
+        src_ip_bytes = ipaddress.IPv6Address(self.src_ip).packed
+        dst_ip_bytes = ipaddress.IPv6Address(self.dst_ip).packed
+
+        return (struct.pack("!IHBB", first_row, len(payload_bytes), next_header, self.hop_limit)
+                + src_ip_bytes + dst_ip_bytes + payload_bytes)
+
+
+class ICMPv6(Packet):
+    def __init__(self, icmp_type, code):
+        self.icmp_type = icmp_type
+        self.code = code
+
+    def get_type(self) -> int:
+        return 58  # 在IPv6报文中ICMPv6的类型
+
+    @abstractmethod
+    def get_payload(self):
+        pass
+
+    def build_packet(self, checksum, data):
+        return struct.pack("!BBH", self.icmp_type, self.code, checksum) + data
+
+    def build_pseudo_header(self, src_ip, dst_ip, packet_bytes):
+        source_ip_bytes = ipaddress.IPv6Address(src_ip).packed
+        dst_ip_bytes = ipaddress.IPv6Address(dst_ip).packed
+        payload_len = len(packet_bytes)
+
+        return source_ip_bytes + dst_ip_bytes + struct.pack("!II", payload_len, self.get_type())
+
+    def do_calc_checksum(self, packet: bytes) -> int:
+        if len(packet) % 2 == 1:
+            packet += b"\0"
+        s = sum(array.array("H", packet))
+        s = (s >> 16) + (s & 0xffff)
+        s += s >> 16
+        s = ~s
+
+        s = ((s >> 8) & 0xff) | s << 8
+
+        return s & 0xffff
+
+    def calc_checksum(self, src_ip, dst_ip, data) -> int:
+        packet_bytes = self.build_packet(0, data)
+        pseudo_header = self.build_pseudo_header(src_ip, dst_ip, packet_bytes)
+        return self.do_calc_checksum(pseudo_header + packet_bytes)
+
+    def build(self, upper_layer: IPv6) -> bytes:
+        payload = self.get_payload()
+        checksum = self.calc_checksum(upper_layer.src_ip, upper_layer.dst_ip, payload)
+        return self.build_packet(checksum, payload)
+
+
+class ICMPv6NDOpt:
+    def __init__(self, opt_type, data: bytes):
+        self.opt_type = opt_type
+        self.data = data
+        if len(data) % 8 != 6:
+            raise Exception("data length invalid")
+
+    def get_opt_type(self):
+        return self.opt_type
+
+    def build(self) -> bytes:
+        length = (len(self.data) + 2) // 8
+        return struct.pack("!BB", self.opt_type, length) + self.data
+
+
+class ICMPv6NDOptDstLLAddr(ICMPv6NDOpt):
+    def __init__(self, mac):
+        data = bytes.fromhex(mac.replace(":", ""))
+        super().__init__(0x02, data)
+
+
+class ICMPv6ND_NA(ICMPv6):
+    def __init__(self, tgt, R=0, S=1, O=1):
+        super().__init__(136, 0)
+        self.tgt = tgt
+        self.R = R
+        self.S = S
+        self.O = O
+        self.opts: list[ICMPv6NDOpt] = list()
+
+    def add_opt(self, opt: ICMPv6NDOpt):
+        self.opts.append(opt)
+
+    def get_payload(self):
+        first_row = ((self.R & 1) << 31) | ((self.S & 1) << 30) | ((self.O & 1) << 29)
+        data = struct.pack("!I", first_row) + ipaddress.IPv6Address(self.tgt).packed
+        for opt in self.opts:
+            data += opt.build()
+        return data
+
+
+def create_socket(iface) -> socket.socket:
+    sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
+    sock.bind((iface, 0))
+    return sock
+
+
+def main():
+    src_if = 'enp0s5'
+    src_ip = "fdb2:2c26:f4e4:0000:5c2d:7ef9:8f01:a3b2"
+    dst_ip = "ff02::1"
+    src_mac = "00:1c:42:f4:57:12"
+    dst_mac = "33:33:00:00:00:01"
+
+    # 1. 构建na报文
+    dst_lladdr_opt = ICMPv6NDOptDstLLAddr(src_mac)
+
+    na = ICMPv6ND_NA(src_ip, S=0)
+    na.add_opt(dst_lladdr_opt)
+
+    # 2. 构建ipv6报文
+    ipv6 = IPv6(src_ip, dst_ip)
+    ipv6.set_payload(na)
+
+    # 3. 构建ether报文
+    ether = Ether(src_mac, dst_mac)
+    ether.set_payload(ipv6)
+
+    # 4. 获取ether报文数据
+    data = ether.build()
+
+    # 5. 常见socket，ether报文发送
+    sock = create_socket(src_if)
+    sock.send(data)
+
+
+if __name__ == '__main__':
+    main()
+
+```
+
